@@ -1,16 +1,11 @@
 <template>
   <div
-    class="VueCarousel-slide"
     tabindex="-1"
     :aria-hidden="!isActive"
     role="tabpanel"
-    :class="{
-      'VueCarousel-slide-active': isActive,
-      'VueCarousel-slide-center': isCenter,
-      'VueCarousel-slide-adjustableHeight': isAdjustableHeight
-    }"
+    :class="slideClass"
   >
-    <slot></slot>
+    <slot/>
   </div>
 </template>
 
@@ -25,16 +20,21 @@ export default {
   },
   inject: ["carousel"],
   mounted() {
-    if (!this.$isServer) {
-      this.$el.addEventListener("dragstart", e => e.preventDefault());
-    }
-
+    this.$el.addEventListener("dragstart", e => e.preventDefault());
     this.$el.addEventListener(
       this.carousel.isTouch ? "touchend" : "mouseup",
       this.onTouchEnd
     );
   },
   computed: {
+    slideClass() {
+      return {
+        'VueCarousel-slide': true,
+        'VueCarousel-slide-active': this.isActive,
+        'VueCarousel-slide-center': this.isCenter,
+        'VueCarousel-slide-adjustableHeight': this.isAdjustableHeight
+      }
+    },
     activeSlides() {
       const { currentPage, breakpointSlidesPerPage, $children } = this.carousel;
       const activeSlides = [];

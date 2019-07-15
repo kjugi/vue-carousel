@@ -1,26 +1,33 @@
 <template>
-  <div
-    v-show="carousel.pageCount > 1"
-    class="VueCarousel-pagination"
-    v-bind:class="{ [`VueCarousel-pagination--${paginationPositionModifierName}`]: paginationPositionModifierName }"
-  >
-    <div class="VueCarousel-dot-container" role="tablist" :style="dotContainerStyle">
-      <button
-        v-for="(page, index) in paginationCount"
-        :key="`${page}_${index}`"
-        class="VueCarousel-dot"
-        aria-hidden="false"
-        role="tab"
-        :title="getDotTitle(index)"
-        :value="getDotTitle(index)"
-        :aria-label="getDotTitle(index)"
-        :aria-selected="isCurrentDot(index) ? 'true' : 'false'"
-        v-bind:class="{ 'VueCarousel-dot--active': isCurrentDot(index) }"
-        v-on:click="goToPage(index)"
-        :style="dotStyle(index)"
-      ></button>
+  <transition name="fade">
+    <div
+      v-show="carousel.pageCount > 1"
+      :class="paginationClass"
+    >
+      <div 
+        class="VueCarousel-dot-container" 
+        role="tablist" 
+        :style="dotContainerStyle"
+      >
+        <button
+          v-for="(page, index) in paginationCount"
+          :key="`${page}_${index}`"
+          aria-hidden="false"
+          role="tab"
+          :title="getDotTitle(index)"
+          :value="getDotTitle(index)"
+          :aria-label="getDotTitle(index)"
+          :aria-selected="isCurrentDot(index) ? 'true' : 'false'"
+          :class="[
+            'VueCarousel-dot',
+            { 'VueCarousel-dot--active': isCurrentDot(index) }
+          ]"
+          v-on:click="goToPage(index)"
+          :style="dotStyle(index)"
+        ></button>
+      </div>
     </div>
-  </div>
+  </transition>
 </template>
 
 <script>
@@ -28,6 +35,12 @@ export default {
   name: "pagination",
   inject: ["carousel"],
   computed: {
+    paginationClass() {
+      return {
+        'VueCarousel-pagination': true,
+        [`VueCarousel-pagination--${this.paginationPositionModifierName}`]: this.paginationPositionModifierName 
+      }
+    },
     paginationPositionModifierName() {
       const { paginationPosition } = this.carousel;
       // guard to add only required class modifiers
@@ -180,5 +193,14 @@ export default {
 
 .VueCarousel-dot:focus {
   outline: 1px solid lightblue;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: all 0.2s;
+}
+.fade-enter,
+.fade-leave-active {
+  opacity: 0;
 }
 </style>

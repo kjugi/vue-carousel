@@ -1,48 +1,40 @@
 <template>
-  <div
-    class="VueCarousel"
-    v-bind:class="{ 'VueCarousel--reverse': paginationPosition === 'top' }"
-  >
+  <transition name="fade">
     <div
-      class="VueCarousel-wrapper"
-      ref="VueCarousel-wrapper"
+      :class="rootClass"
+      ref="VueCarousel"
     >
-      <div
-        ref="VueCarousel-inner"
-        :class="[
-          'VueCarousel-inner',
-          { 'VueCarousel-inner--center': isCenterModeEnabled }
-        ]"
-        :style="{
-          'transform': `translate(${currentOffset}px, 0)`,
-          'transition': dragging ? 'none' : transitionStyle,
-          'ms-flex-preferred-size': `${slideWidth}px`,
-          'webkit-flex-basis': `${slideWidth}px`,
-          'flex-basis': `${slideWidth}px`,
-          'visibility': slideWidth ? 'visible' : 'hidden',
-          'height': `${currentHeight}`,
-          'padding-left': `${padding}px`,
-          'padding-right': `${padding}px`
-        }"
-      >
-        <slot></slot>
+      <div class="VueCarousel-wrapper" ref="VueCarousel-wrapper">
+        <div
+          :class="innerClass"
+          :style="innerStyles"
+          ref="VueCarousel-inner"
+        >
+          <slot name="slides" />
+        </div>
       </div>
+
+      <slot 
+        v-if="navigationEnabled"
+        name="navigation" 
+      >
+        <navigation
+          v-if="isNavigationRequired"
+          :clickTargetSize="navigationClickTargetSize"
+          :nextLabel="navigationNextLabel"
+          :prevLabel="navigationPrevLabel"
+          @navigationclick="handleNavigation"
+        />
+      </slot>
+
+      <slot 
+        v-if="paginationEnabled"
+        name="pagination" 
+      >
+        <pagination @paginationclick="goToPage($event, 'pagination')" />
+      </slot>
     </div>
-
-    <slot name="navigation" v-if="navigationEnabled">
-      <navigation
-        v-if="isNavigationRequired"
-        :clickTargetSize="navigationClickTargetSize"
-        :nextLabel="navigationNextLabel"
-        :prevLabel="navigationPrevLabel"
-        @navigationclick="handleNavigation"
-      />
-    </slot>
-
-    <slot name="pagination" v-if="paginationEnabled">
-      <pagination @paginationclick="goToPage($event, 'pagination')"/>
-    </slot>
-  </div>
+  </transition>
 </template>
 <script>
 import autoplay from "./mixins/autoplay";
@@ -90,7 +82,6 @@ export default {
   },
   data() {
     return {
-      browserWidth: null,
       carouselWidth: 0,
       currentPage: 0,
       dragging: false,
@@ -391,6 +382,31 @@ export default {
     }
   },
   computed: {
+    rootClass() {
+      return {
+        'VueCarousel': true,
+        'VueCarousel--reverse': this.paginationPosition === 'top'
+      }
+    },
+    innerClass() {
+      return {
+        'VueCarousel-inner': true,
+        'VueCarousel-inner--center': this.isCenterModeEnabled
+      }
+    },
+    innerStyles() {
+      return {
+        transform: `translate(${this.currentOffset}px, 0)`,
+        transition: this.dragging ? 'none' : this.transitionStyle,
+        'ms-flex-preferred-size': `${this.slideWidth}px`,
+        'webkit-flex-basis': `${this.slideWidth}px`,
+        'flex-basis': `${this.slideWidth}px`,
+        visibility: this.slideWidth ? 'visible' : 'hidden',
+        height: `${this.currentHeight}`,
+        'padding-left': `${this.padding}px`,
+        'padding-right': `${this.padding}px`
+      }
+    },
     /**
      * Given a viewport width, find the number of slides to display
      * @param  {Number} width Current viewport width in pixels
@@ -402,10 +418,10 @@ export default {
       }
 
       const breakpointArray = this.perPageCustom;
-      const width = this.browserWidth;
+      const width = this.carouselWidth;
 
-      const breakpoints = breakpointArray.sort(
-        (a, b) => (a[0] > b[0] ? -1 : 1)
+      const breakpoints = breakpointArray.sort((a, b) =>
+        a[0] > b[0] ? -1 : 1
       );
 
       // Reduce the breakpoints to entries where the width is in range
@@ -560,65 +576,10 @@ export default {
         this.goToPage(this.pageCount);
       });
     },
-    /**
-     * A mutation observer is used to detect changes to the containing node
-     * in order to keep the magnet container in sync with the height its reference node.
-     */
-    attachMutationObserver() {
-      const MutationObserver =
-        window.MutationObserver ||
-        window.WebKitMutationObserver ||
-        window.MozMutationObserver;
-
-      if (MutationObserver) {
-        let config = {
-          attributes: true,
-          data: true
-        };
-        if (this.adjustableHeight) {
-          config = {
-            ...config,
-            childList: true,
-            subtree: true,
-            characterData: true
-          };
-        }
-        this.mutationObserver = new MutationObserver(() => {
-          this.$nextTick(() => {
-            this.computeCarouselWidth();
-            this.computeCarouselHeight();
-          });
-        });
-        if (this.$parent.$el) {
-          let carouselInnerElements = this.$el.getElementsByClassName(
-            "VueCarousel-inner"
-          );
-          for (let i = 0; i < carouselInnerElements.length; i++) {
-            this.mutationObserver.observe(carouselInnerElements[i], config);
-          }
-        }
-      }
-    },
     handleNavigation(direction) {
       this.advancePage(direction);
       this.pauseAutoplay();
       this.$emit("navigation-click", direction);
-    },
-    /**
-     * Stop listening to mutation changes
-     */
-    detachMutationObserver() {
-      if (this.mutationObserver) {
-        this.mutationObserver.disconnect();
-      }
-    },
-    /**
-     * Get the current browser viewport width
-     * @return {Number} Browser"s width in pixels
-     */
-    getBrowserWidth() {
-      this.browserWidth = window.innerWidth;
-      return this.browserWidth;
     },
     /**
      * Get the width of the carousel DOM element
@@ -721,20 +682,18 @@ export default {
      */
     /* istanbul ignore next */
     onStart(e) {
-      // alert("start");
-
       // detect right click
       if (e.button == 2) {
         return;
       }
 
-      document.addEventListener(
+      this.$refs["VueCarousel-inner"].addEventListener(
         this.isTouch ? "touchend" : "mouseup",
         this.onEnd,
         true
       );
 
-      document.addEventListener(
+      this.$refs["VueCarousel-inner"].addEventListener(
         this.isTouch ? "touchmove" : "mousemove",
         this.onDrag,
         true
@@ -784,12 +743,12 @@ export default {
       this.render();
 
       // clear events listeners
-      document.removeEventListener(
+      this.$refs["VueCarousel-inner"].removeEventListener(
         this.isTouch ? "touchend" : "mouseup",
         this.onEnd,
         true
       );
-      document.removeEventListener(
+      this.$refs["VueCarousel-inner"].removeEventListener(
         this.isTouch ? "touchmove" : "mousemove",
         this.onDrag,
         true
@@ -887,8 +846,6 @@ export default {
      */
     computeCarouselWidth() {
       this.getSlideCount();
-      this.getBrowserWidth();
-      this.getCarouselWidth();
       this.setCurrentPageInBounds();
     },
     /**
@@ -916,12 +873,16 @@ export default {
       this.$emit("transition-end");
     }
   },
-  mounted() {
-    window.addEventListener(
-      "resize",
-      debounce(this.onResize, this.refreshRate)
-    );
+  created() {
+    this.computeCarouselWidth();
+    this.computeCarouselHeight();
 
+    // when autoplay direction is backward start from the last slide
+    if (this.autoplayDirection === "backward") {
+      this.goToLastSlide();
+    }
+  },
+  mounted() {
     // setup the start event only if touch device or mousedrag activated
     if ((this.isTouch && this.touchDrag) || this.mouseDrag) {
       this.$refs["VueCarousel-wrapper"].addEventListener(
@@ -930,9 +891,7 @@ export default {
       );
     }
 
-    this.attachMutationObserver();
-    this.computeCarouselWidth();
-    this.computeCarouselHeight();
+    this.getCarouselWidth();
 
     this.transitionstart = getTransitionEnd();
     this.$refs["VueCarousel-inner"].addEventListener(
@@ -946,15 +905,8 @@ export default {
     );
 
     this.$emit("mounted");
-
-    // when autoplay direction is backward start from the last slide
-    if (this.autoplayDirection === "backward") {
-      this.goToLastSlide();
-    }
   },
   beforeDestroy() {
-    this.detachMutationObserver();
-    window.removeEventListener("resize", this.getBrowserWidth);
     this.$refs["VueCarousel-inner"].removeEventListener(
       this.transitionstart,
       this.handleTransitionStart
@@ -996,5 +948,14 @@ export default {
 
 .VueCarousel-inner--center {
   justify-content: center;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: all 0.2s;
+}
+.fade-enter,
+.fade-leave-active {
+  opacity: 0;
 }
 </style>
